@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login - Student Feedback{% endblock %}
+
+{% block content %}
+<div class="card login-card">
+    <h2>🔐 Admin Login</h2>
+    <p class="subtitle">Please enter the admin password to continue.</p>
+
+    <form action="{{ url_for('admin_login') }}" method="POST" class="login-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" placeholder="Enter admin password" autofocus required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-large">
+            Login →
+        </button>
+    </form>
+
+    <a href="{{ url_for('index') }}" class="back-link">← Back to Feedback Form</a>
+</div>
+{% endblock %}

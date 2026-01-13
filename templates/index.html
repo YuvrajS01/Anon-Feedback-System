@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Enter Token - Student Feedback{% endblock %}
+
+{% block content %}
+<div class="card token-card">
+    <h2>Welcome to the Feedback System</h2>
+    <p class="subtitle">Please enter your one-time feedback token to continue.</p>
+
+    <form action="{{ url_for('verify_token') }}" method="POST" class="token-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label for="token">Your Token</label>
+            <input type="text" id="token" name="token" placeholder="Enter 6-character token" maxlength="6"
+                autocomplete="off" autofocus required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-large">
+            Continue →
+        </button>
+    </form>
+
+    <p class="help-text">
+        Don't have a token? Please contact your class representative or administrator.
+    </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-uppercase token input
+    document.getElementById('token').addEventListener('input', function (e) {
+        this.value = this.value.toUpperCase();
+    });
+</script>
+{% endblock %}

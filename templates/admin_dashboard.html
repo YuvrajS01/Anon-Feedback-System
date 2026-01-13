@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Student Feedback{% endblock %}
+
+{% block head %}
+<style>
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .admin-header h2 {
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard">
+    <div class="admin-header">
+        <h2>📊 Admin Dashboard</h2>
+        <a href="{{ url_for('admin_logout') }}" class="btn btn-secondary btn-small">Logout</a>
+    </div>
+
+    <!-- Token Statistics -->
+    <div class="card stats-card">
+        <h3>Token Statistics</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-value">{{ token_stats.total }}</span>
+                <span class="stat-label">Total Tokens</span>
+            </div>
+            <div class="stat-item stat-success">
+                <span class="stat-value">{{ token_stats.used }}</span>
+                <span class="stat-label">Used</span>
+            </div>
+            <div class="stat-item stat-pending">
+                <span class="stat-value">{{ token_stats.unused }}</span>
+                <span class="stat-label">Unused</span>
+            </div>
+        </div>
+
+        {% if token_stats.total > 0 %}
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ (token_stats.used / token_stats.total * 100)|round }}%"></div>
+        </div>
+        <p class="progress-label">{{ (token_stats.used / token_stats.total * 100)|round }}% response rate</p>
+        {% endif %}
+    </div>
+
+    <!-- Overall Question Averages -->
+    {% if question_averages %}
+    <div class="card">
+        <h3>Overall Question Averages</h3>
+        <div class="questions-avg-list">
+            {% for i in range(10) %}
+            <div class="question-avg-item">
+                <span class="question-text">{{ questions[i] }}</span>
+                <div class="avg-bar-container">
+                    <div class="avg-bar" style="width: {{ (question_averages['q' ~ (i+1)] or 0) * 10 }}%"></div>
+                </div>
+                <span class="avg-value">{{ question_averages['q' ~ (i+1)] or 'N/A' }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Teacher Summary -->
+    <div class="card">
+        <h3>Teacher-wise Summary</h3>
+
+        {% if teacher_summary %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Teacher</th>
+                        <th>Responses</th>
+                        <th>Avg Rating</th>
+                        <th>Export</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for teacher in teacher_summary %}
+                    <tr>
+                        <td>{{ teacher.teacher }}</td>
+                        <td>{{ teacher.feedback_count }}</td>
+                        <td>
+                            <span class="rating-badge 
+                                {% if teacher.overall_avg >= 7 %}rating-high
+                                {% elif teacher.overall_avg >= 4 %}rating-medium
+                                {% else %}rating-low{% endif %}">
+                                {{ teacher.overall_avg }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('export_teacher', teacher_name=teacher.teacher) }}"
+                                class="btn btn-small btn-export">
+                                📥 Excel
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="no-data">No feedback data available yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Export Options -->
+    <div class="card">
+        <h3>Export Reports</h3>
+        <div class="export-grid">
+            <div class="export-section">
+                <h4>All Feedback</h4>
+                <a href="{{ url_for('export_all') }}" class="btn btn-primary">
+                    📥 Download All Feedback
+                </a>
+            </div>
+
+            <div class="export-section">
+                <h4>By Teacher</h4>
+                <div class="export-buttons">
+                    {% for teacher in teachers %}
+                    <a href="{{ url_for('export_teacher', teacher_name=teacher) }}" class="btn btn-secondary btn-small">
+                        {{ teacher }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="export-section">
+                <h4>By Subject</h4>
+                <div class="export-buttons">
+                    {% for subject in subjects %}
+                    <a href="{{ url_for('export_subject', subject_name=subject) }}" class="btn btn-secondary btn-small">
+                        {{ subject }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

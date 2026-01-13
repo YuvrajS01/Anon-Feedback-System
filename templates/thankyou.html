@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Thank You - Student Feedback{% endblock %}
+
+{% block content %}
+<div class="card thankyou-card">
+    <div class="success-icon">✓</div>
+    <h2>Thank You!</h2>
+    <p class="subtitle">Your feedback has been submitted successfully.</p>
+
+    <div class="thankyou-message">
+        <p>We appreciate you taking the time to share your thoughts. Your feedback helps us improve the quality of
+            education.</p>
+        <p class="privacy-reminder">🔒 Remember: Your response is completely anonymous and cannot be traced back to you.
+        </p>
+    </div>
+
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+        Submit Another Feedback
+    </a>
+</div>
+{% endblock %}
