@@ -34,19 +34,19 @@ from config import CONFIG_FILE, load_combos, save_combos, DATABASE_PATH
 
 
 class ModernStyle:
-    """Modern dark theme colors and styles - Premium Edition."""
-    # Deep Mesh Background
-    BG_DARK = "#02040a"      # Page background
-    BG_CARD = "#0f172a"      # Card background (matches mesh-1)
-    BG_INPUT = "#080c14"     # Input background (matches mesh-2)
+    """Modern dark theme colors and styles - Simple Edition."""
+    # Slate Theme
+    BG_DARK = "#0f172a"      # Slate 900
+    BG_CARD = "#1e293b"      # Slate 800
+    BG_INPUT = "#334155"     # Slate 700
     
-    # Electric Accents
-    ACCENT = "#00f2ea"       # Electric Cyan
-    ACCENT_HOVER = "#00c2bd" # Darker Cyan
+    # Indigo Accents
+    ACCENT = "#6366f1"       # Indigo 500
+    ACCENT_HOVER = "#4f46e5" # Indigo 600
     
     # Functional
-    SUCCESS = "#00e676"
-    WARNING = "#ffab00"
+    SUCCESS = "#10b981"
+    WARNING = "#f59e0b"
     ERROR = "#FF1744"        # Red
     
     # Typography
@@ -129,7 +129,7 @@ class ControlPanel:
         # Configure button style
         style.configure("Accent.TButton",
                        background=ModernStyle.ACCENT,
-                       foreground="#000000",  # Black text on Cyan
+                       foreground=ModernStyle.TEXT_PRIMARY,  # White text on Indigo
                        font=('Segoe UI', 10, 'bold'),
                        padding=(15, 8))
         
