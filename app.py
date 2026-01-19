@@ -3,6 +3,7 @@ Flask-Based Local Anonymous Student Feedback System.
 
 This application provides:
 - Token-based anonymous feedback submission
+- Multi-teacher feedback per token (admin configurable combos)
 - Admin dashboard with analytics
 - Excel report exports
 
@@ -18,7 +19,7 @@ from datetime import datetime
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, abort
+    session, flash, send_file, abort, jsonify
 )
 from flask_wtf.csrf import CSRFProtect
 from openpyxl import Workbook
@@ -29,7 +30,9 @@ import config
 from database import (
     init_db, validate_token, mark_token_used, save_feedback,
     get_token_stats, get_all_feedback, get_feedback_by_teacher,
-    get_feedback_by_subject, get_teacher_summary, get_question_averages
+    get_feedback_by_subject, get_teacher_summary, get_question_averages,
+    create_session, get_session_by_token, update_session_progress,
+    get_completed_combo_indices, get_session_stats
 )
 
 
@@ -56,6 +59,11 @@ def admin_required(f):
     return decorated_function
 
 
+def get_current_combos():
+    """Get current teacher-subject combos (reload from config for live updates)."""
+    return config.load_combos()
+
+
 # =============================================================================
 # Student Routes
 # =============================================================================
@@ -68,58 +76,105 @@ def index():
 
 @app.route('/verify-token', methods=['POST'])
 def verify_token():
-    """Validate the submitted token."""
+    """Validate the submitted token and create/resume session."""
     token = request.form.get('token', '').strip().upper()
     
     if not token:
         flash('Please enter a token.', 'error')
         return redirect(url_for('index'))
     
+    combos = get_current_combos()
+    
+    if not combos:
+        flash('No feedback combos configured. Please contact admin.', 'error')
+        return redirect(url_for('index'))
+    
+    # Check if session already exists for this token
+    existing_session = get_session_by_token(token)
+    
+    if existing_session:
+        if existing_session['is_complete']:
+            flash('This token has already been used to submit all feedback.', 'error')
+            return redirect(url_for('index'))
+        # Resume existing session
+        session['valid_token'] = token
+        session['session_id'] = existing_session['id']
+        session['total_combos'] = existing_session['total_combos']
+        # Find next incomplete combo
+        completed = get_completed_combo_indices(existing_session['id'])
+        next_index = 0
+        for i in range(len(combos)):
+            if i not in completed:
+                next_index = i
+                break
+        return redirect(url_for('feedback_step', index=next_index))
+    
+    # Validate token exists and is unused
     if not validate_token(token):
         flash('Invalid or already used token.', 'error')
         return redirect(url_for('index'))
     
-    # Store token in session temporarily (will be cleared after submission)
+    # Create new session
+    session_id = create_session(token, len(combos))
     session['valid_token'] = token
-    return redirect(url_for('feedback'))
+    session['session_id'] = session_id
+    session['total_combos'] = len(combos)
+    
+    return redirect(url_for('feedback_step', index=0))
 
 
-@app.route('/feedback')
-def feedback():
-    """Feedback form page."""
-    if 'valid_token' not in session:
+@app.route('/feedback/<int:index>')
+def feedback_step(index):
+    """Feedback form page for a specific teacher-subject combo."""
+    if 'valid_token' not in session or 'session_id' not in session:
         flash('Please enter a valid token first.', 'error')
         return redirect(url_for('index'))
     
+    combos = get_current_combos()
+    
+    if index < 0 or index >= len(combos):
+        flash('Invalid feedback step.', 'error')
+        return redirect(url_for('index'))
+    
+    # Check if this combo is already completed
+    completed = get_completed_combo_indices(session['session_id'])
+    if index in completed:
+        # Find next incomplete or go to thank you
+        for i in range(len(combos)):
+            if i not in completed:
+                return redirect(url_for('feedback_step', index=i))
+        return redirect(url_for('thankyou'))
+    
+    current_combo = combos[index]
+    
     return render_template(
-        'feedback.html',
-        teachers=config.TEACHERS,
-        subjects=config.SUBJECTS,
+        'feedback_step.html',
+        combo=current_combo,
+        combo_index=index,
+        total_combos=len(combos),
+        completed_count=len(completed),
         questions=config.QUESTIONS
     )
 
 
-@app.route('/submit', methods=['POST'])
-def submit():
-    """Process and save feedback submission."""
-    if 'valid_token' not in session:
+@app.route('/submit/<int:index>', methods=['POST'])
+def submit_step(index):
+    """Process and save feedback for a specific combo."""
+    if 'valid_token' not in session or 'session_id' not in session:
         flash('Session expired. Please enter your token again.', 'error')
         return redirect(url_for('index'))
     
-    token = session['valid_token']
+    session_id = session['session_id']
+    combos = get_current_combos()
     
-    # Validate form data
-    teacher = request.form.get('teacher', '').strip()
-    subject = request.form.get('subject', '').strip()
+    if index < 0 or index >= len(combos):
+        flash('Invalid feedback step.', 'error')
+        return redirect(url_for('index'))
+    
+    current_combo = combos[index]
+    teacher = current_combo['teacher']
+    subject = current_combo['subject']
     comment = request.form.get('comment', '').strip()
-    
-    if not teacher or teacher not in config.TEACHERS:
-        flash('Please select a valid teacher.', 'error')
-        return redirect(url_for('feedback'))
-    
-    if not subject or subject not in config.SUBJECTS:
-        flash('Please select a valid subject.', 'error')
-        return redirect(url_for('feedback'))
     
     # Collect ratings (q1 to q10)
     ratings = []
@@ -131,19 +186,30 @@ def submit():
             ratings.append(rating)
         except (ValueError, TypeError):
             flash(f'Please provide a valid rating (1-10) for all questions.', 'error')
-            return redirect(url_for('feedback'))
-    
-    # Mark token as used FIRST (prevents race conditions)
-    if not mark_token_used(token):
-        flash('Token has already been used.', 'error')
-        session.pop('valid_token', None)
-        return redirect(url_for('index'))
+            return redirect(url_for('feedback_step', index=index))
     
     # Save feedback
-    save_feedback(teacher, subject, ratings, comment)
+    save_feedback(session_id, index, teacher, subject, ratings, comment)
     
-    # Clear session
-    session.pop('valid_token', None)
+    # Update session progress
+    completed = get_completed_combo_indices(session_id)
+    completed_count = len(completed)
+    
+    if completed_count >= len(combos):
+        # All combos completed, mark token as used and session as complete
+        mark_token_used(session['valid_token'])
+        update_session_progress(session_id, completed_count, is_complete=True)
+        # Clear session
+        session.pop('valid_token', None)
+        session.pop('session_id', None)
+        session.pop('total_combos', None)
+        return redirect(url_for('thankyou'))
+    else:
+        update_session_progress(session_id, completed_count)
+        # Find next incomplete combo
+        for i in range(len(combos)):
+            if i not in completed:
+                return redirect(url_for('feedback_step', index=i))
     
     return redirect(url_for('thankyou'))
 
@@ -185,17 +251,25 @@ def admin_logout():
 def admin_dashboard():
     """Admin dashboard with statistics and analytics."""
     token_stats = get_token_stats()
+    session_stats = get_session_stats()
     teacher_summary = get_teacher_summary()
     question_averages = get_question_averages()
+    combos = get_current_combos()
+    
+    # Get unique teachers and subjects from combos for export options
+    teachers = list(set(c['teacher'] for c in combos))
+    subjects = list(set(c['subject'] for c in combos))
     
     return render_template(
         'admin_dashboard.html',
         token_stats=token_stats,
+        session_stats=session_stats,
         teacher_summary=teacher_summary,
         question_averages=question_averages,
         questions=config.QUESTIONS,
-        teachers=config.TEACHERS,
-        subjects=config.SUBJECTS
+        teachers=teachers,
+        subjects=subjects,
+        combos=combos
     )
 
 
@@ -270,9 +344,6 @@ def export_all():
 @admin_required
 def export_teacher(teacher_name: str):
     """Export feedback for a specific teacher."""
-    if teacher_name not in config.TEACHERS:
-        abort(404)
-    
     feedback = get_feedback_by_teacher(teacher_name)
     if not feedback:
         flash(f'No feedback data for {teacher_name}.', 'error')
@@ -294,9 +365,6 @@ def export_teacher(teacher_name: str):
 @admin_required
 def export_subject(subject_name: str):
     """Export feedback for a specific subject."""
-    if subject_name not in config.SUBJECTS:
-        abort(404)
-    
     feedback = get_feedback_by_subject(subject_name)
     if not feedback:
         flash(f'No feedback data for {subject_name}.', 'error')
@@ -330,12 +398,15 @@ if __name__ == '__main__':
     except:
         local_ip = '127.0.0.1'
     
+    combos = get_current_combos()
+    
     print("=" * 60)
     print("  Anonymous Student Feedback System")
     print("=" * 60)
     print(f"  Local URL:    http://127.0.0.1:5000")
     print(f"  Network URL:  http://{local_ip}:5000")
     print(f"  Admin Panel:  http://127.0.0.1:5000/admin")
+    print(f"  Combos:       {len(combos)} teacher-subject pairs")
     print("=" * 60)
     print("  Press Ctrl+C to stop the server")
     print("=" * 60)

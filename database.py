@@ -21,10 +21,24 @@ def init_db():
             )
         ''')
         
+        # Create feedback sessions table (tracks multi-feedback submissions)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS feedback_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token TEXT NOT NULL UNIQUE,
+                total_combos INTEGER NOT NULL,
+                completed_combos INTEGER DEFAULT 0,
+                is_complete INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # Create feedback table (no token reference for anonymity)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS feedback (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER,
+                combo_index INTEGER,
                 teacher TEXT NOT NULL,
                 subject TEXT NOT NULL,
                 q1 INTEGER NOT NULL,
@@ -38,7 +52,8 @@ def init_db():
                 q9 INTEGER NOT NULL,
                 q10 INTEGER NOT NULL,
                 comment TEXT,
-                submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES feedback_sessions(id)
             )
         ''')
         
@@ -110,16 +125,62 @@ def get_token_stats() -> dict:
         }
 
 
+# Session operations
+def create_session(token: str, total_combos: int) -> int:
+    """Create a new feedback session for a token."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO feedback_sessions (token, total_combos, completed_combos)
+            VALUES (?, ?, 0)
+        ''', (token, total_combos))
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_session_by_token(token: str) -> dict:
+    """Get session info by token."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM feedback_sessions WHERE token = ?
+        ''', (token,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def update_session_progress(session_id: int, completed: int, is_complete: bool = False):
+    """Update session progress."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE feedback_sessions 
+            SET completed_combos = ?, is_complete = ?
+            WHERE id = ?
+        ''', (completed, 1 if is_complete else 0, session_id))
+        conn.commit()
+
+
+def get_completed_combo_indices(session_id: int) -> list:
+    """Get list of already completed combo indices for a session."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT combo_index FROM feedback WHERE session_id = ?
+        ''', (session_id,))
+        return [row['combo_index'] for row in cursor.fetchall()]
+
+
 # Feedback operations
-def save_feedback(teacher: str, subject: str, ratings: list, comment: str):
+def save_feedback(session_id: int, combo_index: int, teacher: str, subject: str, ratings: list, comment: str):
     """Save feedback to database."""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO feedback 
-            (teacher, subject, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, comment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (teacher, subject, *ratings, comment))
+            (session_id, combo_index, teacher, subject, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, comment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (session_id, combo_index, teacher, subject, *ratings, comment))
         conn.commit()
 
 
@@ -160,6 +221,7 @@ def get_teacher_summary() -> list:
         cursor.execute('''
             SELECT 
                 teacher,
+                subject,
                 COUNT(*) as feedback_count,
                 ROUND(AVG(q1), 2) as avg_q1,
                 ROUND(AVG(q2), 2) as avg_q2,
@@ -174,7 +236,7 @@ def get_teacher_summary() -> list:
                 ROUND((AVG(q1) + AVG(q2) + AVG(q3) + AVG(q4) + AVG(q5) + 
                        AVG(q6) + AVG(q7) + AVG(q8) + AVG(q9) + AVG(q10)) / 10, 2) as overall_avg
             FROM feedback
-            GROUP BY teacher
+            GROUP BY teacher, subject
             ORDER BY overall_avg DESC
         ''')
         return [dict(row) for row in cursor.fetchall()]
@@ -202,3 +264,30 @@ def get_question_averages() -> dict:
         if row:
             return dict(row)
         return {}
+
+
+def reset_database():
+    """Reset the database (delete all data except tokens table structure)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM feedback')
+        cursor.execute('DELETE FROM feedback_sessions')
+        cursor.execute('DELETE FROM tokens')
+        conn.commit()
+
+
+def get_session_stats() -> dict:
+    """Get session statistics for admin dashboard."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) as total FROM feedback_sessions')
+        total = cursor.fetchone()['total']
+        
+        cursor.execute('SELECT COUNT(*) as complete FROM feedback_sessions WHERE is_complete = 1')
+        complete = cursor.fetchone()['complete']
+        
+        return {
+            'total_sessions': total,
+            'complete_sessions': complete,
+            'incomplete_sessions': total - complete
+        }

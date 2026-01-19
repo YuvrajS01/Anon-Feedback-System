@@ -5,14 +5,15 @@
 {% block content %}
 <div class="card login-card">
     <h2>🔐 Admin Login</h2>
-    <p class="subtitle">Please enter the admin password to continue.</p>
+    <p class="subtitle">Enter your admin password to access the dashboard.</p>
 
-    <form action="{{ url_for('admin_login') }}" method="POST" class="login-form">
+    <form action="{{ url_for('admin_login') }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" placeholder="Enter admin password" autofocus required>
+            <input type="password" id="password" name="password" placeholder="Enter admin password"
+                autocomplete="current-password" autofocus required>
         </div>
 
         <button type="submit" class="btn btn-primary btn-large">
@@ -20,6 +21,8 @@
         </button>
     </form>
 
-    <a href="{{ url_for('index') }}" class="back-link">← Back to Feedback Form</a>
+    <a href="{{ url_for('index') }}" class="back-link">
+        ← Back to Feedback Form
+    </a>
 </div>
 {% endblock %}

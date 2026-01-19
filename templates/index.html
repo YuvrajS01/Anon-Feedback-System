@@ -1,37 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}Enter Token - Student Feedback{% endblock %}
+{% block title %}Start - Feedback System{% endblock %}
 
 {% block content %}
-<div class="card token-card">
-    <h2>Welcome to the Feedback System</h2>
-    <p class="subtitle">Please enter your one-time feedback token to continue.</p>
+<div class="token-card">
+    <div class="card">
+        <h2 style="margin-bottom: 1rem; text-align: center;">Welcome</h2>
+        <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem;">
+            Please enter your access token to begin providing anonymous feedback.
+        </p>
 
-    <form action="{{ url_for('verify_token') }}" method="POST" class="token-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form action="{{ url_for('verify_token') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="form-group">
-            <label for="token">Your Token</label>
-            <input type="text" id="token" name="token" placeholder="Enter 6-character token" maxlength="6"
-                autocomplete="off" autofocus required>
-        </div>
+            <div class="token-input-group">
+                <input type="text" name="token" class="token-input" placeholder="TOKEN" maxlength="10" required
+                    autofocus autocomplete="off">
+            </div>
 
-        <button type="submit" class="btn btn-primary btn-large">
-            Continue →
-        </button>
-    </form>
+            <button type="submit" class="btn btn-primary btn-large">
+                Start Session
+            </button>
+        </form>
+    </div>
 
-    <p class="help-text">
-        Don't have a token? Please contact your class representative or administrator.
-    </p>
+    <div style="margin-top: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+        If you don't have a token, please contact your administrator.
+    </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Auto-uppercase token input
-    document.getElementById('token').addEventListener('input', function (e) {
-        this.value = this.value.toUpperCase();
-    });
-</script>
 {% endblock %}

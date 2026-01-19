@@ -2,21 +2,6 @@
 
 {% block title %}Admin Dashboard - Student Feedback{% endblock %}
 
-{% block head %}
-<style>
-    .admin-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-
-    .admin-header h2 {
-        margin: 0;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="admin-dashboard">
     <div class="admin-header">
@@ -24,9 +9,9 @@
         <a href="{{ url_for('admin_logout') }}" class="btn btn-secondary btn-small">Logout</a>
     </div>
 
-    <!-- Token Statistics -->
-    <div class="card stats-card">
-        <h3>Token Statistics</h3>
+    <!-- Token & Session Statistics -->
+    <div class="card">
+        <h3>Statistics</h3>
         <div class="stats-grid">
             <div class="stat-item">
                 <span class="stat-value">{{ token_stats.total }}</span>
@@ -40,18 +25,46 @@
                 <span class="stat-value">{{ token_stats.unused }}</span>
                 <span class="stat-label">Unused</span>
             </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ session_stats.complete_sessions }}</span>
+                <span class="stat-label">Complete</span>
+            </div>
         </div>
 
         {% if token_stats.total > 0 %}
-        <div class="progress-bar">
+        <div class="progress-bar" style="margin-top: 1rem;">
             <div class="progress-fill" style="width: {{ (token_stats.used / token_stats.total * 100)|round }}%"></div>
         </div>
-        <p class="progress-label">{{ (token_stats.used / token_stats.total * 100)|round }}% response rate</p>
+        <p style="text-align: center; font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">
+            {{ (token_stats.used / token_stats.total * 100)|round }}% response rate
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Current Teacher-Subject Combos -->
+    <div class="card">
+        <h3>Active Teacher-Subject Combos</h3>
+        {% if combos %}
+        <div class="combos-list">
+            {% for combo in combos %}
+            <div class="combo-item">
+                <div class="combo-info">
+                    <span class="combo-number">{{ loop.index }}</span>
+                    <div>
+                        <strong>{{ combo.teacher }}</strong>
+                        <span style="color: var(--text-muted);"> — {{ combo.subject }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="no-data">No combos configured. Use the Control Panel to add teacher-subject pairs.</p>
         {% endif %}
     </div>
 
     <!-- Overall Question Averages -->
-    {% if question_averages %}
+    {% if question_averages and question_averages.q1 is not none %}
     <div class="card">
         <h3>Overall Question Averages</h3>
         <div class="questions-avg-list">
@@ -68,9 +81,9 @@
     </div>
     {% endif %}
 
-    <!-- Teacher Summary -->
+    <!-- Teacher-Subject Summary -->
     <div class="card">
-        <h3>Teacher-wise Summary</h3>
+        <h3>Teacher-Subject Summary</h3>
 
         {% if teacher_summary %}
         <div class="table-responsive">
@@ -78,26 +91,28 @@
                 <thead>
                     <tr>
                         <th>Teacher</th>
+                        <th>Subject</th>
                         <th>Responses</th>
                         <th>Avg Rating</th>
                         <th>Export</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for teacher in teacher_summary %}
+                    {% for item in teacher_summary %}
                     <tr>
-                        <td>{{ teacher.teacher }}</td>
-                        <td>{{ teacher.feedback_count }}</td>
+                        <td>{{ item.teacher }}</td>
+                        <td>{{ item.subject }}</td>
+                        <td>{{ item.feedback_count }}</td>
                         <td>
                             <span class="rating-badge 
-                                {% if teacher.overall_avg >= 7 %}rating-high
-                                {% elif teacher.overall_avg >= 4 %}rating-medium
+                                {% if item.overall_avg >= 7 %}rating-high
+                                {% elif item.overall_avg >= 4 %}rating-medium
                                 {% else %}rating-low{% endif %}">
-                                {{ teacher.overall_avg }}
+                                {{ item.overall_avg }}
                             </span>
                         </td>
                         <td>
-                            <a href="{{ url_for('export_teacher', teacher_name=teacher.teacher) }}"
+                            <a href="{{ url_for('export_teacher', teacher_name=item.teacher) }}"
                                 class="btn btn-small btn-export">
                                 📥 Excel
                             </a>
@@ -123,6 +138,7 @@
                 </a>
             </div>
 
+            {% if teachers %}
             <div class="export-section">
                 <h4>By Teacher</h4>
                 <div class="export-buttons">
@@ -133,7 +149,9 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
+            {% if subjects %}
             <div class="export-section">
                 <h4>By Subject</h4>
                 <div class="export-buttons">
@@ -144,6 +162,7 @@
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

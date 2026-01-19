@@ -1,0 +1,24 @@
+{
+  "teacher_subject_combos": [
+    {
+      "teacher": "Prof. Ritesh",
+      "subject": "DSA"
+    },
+    {
+      "teacher": "Prof. Pratik",
+      "subject": "Cyber Sec"
+    },
+    {
+      "teacher": "Prof. Garima",
+      "subject": "ML"
+    },
+    {
+      "teacher": "Prof Alok",
+      "subject": "COA"
+    },
+    {
+      "teacher": "Prof. Kanchan",
+      "subject": "AI"
+    }
+  ]
+}

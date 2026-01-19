@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback for {{ combo.teacher }} - Student Feedback{% endblock %}
+
+{% block content %}
+<div class="card">
+    <!-- Progress Section -->
+    <div class="progress-section">
+        <div class="progress-header">
+            <span>Feedback Progress</span>
+            <span>{{ completed_count + 1 }} / {{ total_combos }}</span>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" style="width: {{ ((completed_count) / total_combos * 100)|round }}%"></div>
+        </div>
+    </div>
+
+    <!-- Current Teacher-Subject -->
+    <div class="combo-card">
+        <div class="combo-teacher">{{ combo.teacher }}</div>
+        <div class="combo-subject">{{ combo.subject }}</div>
+    </div>
+
+    <!-- Feedback Form -->
+    <form action="{{ url_for('submit_step', index=combo_index) }}" method="POST" id="feedbackForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Rating Questions -->
+        <div class="questions-list">
+            {% for question in questions %}
+            {% set q_idx = loop.index %}
+            <div class="question-item">
+                <label class="question-label">
+                    <span class="question-number">{{ q_idx }}.</span>
+                    {{ question }}
+                </label>
+
+                <div class="rating-blocks">
+                    {% for i in range(1, 11) %}
+                    <input type="radio" name="q{{ q_idx }}" id="q{{ q_idx }}_{{ i }}" value="{{ i }}"
+                        class="rating-block-input" {% if i==5 %}checked{% endif %} required>
+                    <label for="q{{ q_idx }}_{{ i }}" class="rating-block-label">{{ i }}</label>
+                    {% endfor %}
+                </div>
+                <div class="rating-range-labels">
+                    <span>Poor</span>
+                    <span>Excellent</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Comments -->
+        <div class="form-group">
+            <label for="comment">Additional Comments (Optional)</label>
+            <textarea id="comment" name="comment" placeholder="Share any specific feedback or suggestions..."
+                rows="4"></textarea>
+        </div>
+
+        <!-- Navigation / Submit -->
+        <div class="nav-buttons" style="margin-top: 2rem;">
+            {% if completed_count + 1 < total_combos %} <button type="submit" class="btn btn-primary btn-large">
+                Next: {{ (completed_count + 2) }} / {{ total_combos }} &rarr;
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-primary btn-large">
+                    Submit All Feedback &checkmark;
+                </button>
+                {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}
