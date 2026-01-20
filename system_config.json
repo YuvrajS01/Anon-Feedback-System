@@ -1,4 +1,7 @@
 {
+  "semester": 7,
+  "session": "2022-26",
+  "branch": "CSE",
   "teacher_subject_combos": [
     {
       "teacher": "Prof. Ritesh",
@@ -11,14 +14,6 @@
     {
       "teacher": "Prof. Garima",
       "subject": "ML"
-    },
-    {
-      "teacher": "Prof Alok",
-      "subject": "COA"
-    },
-    {
-      "teacher": "Prof. Kanchan",
-      "subject": "AI"
     }
   ]
 }

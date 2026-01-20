@@ -41,6 +41,9 @@ def init_db():
                 combo_index INTEGER,
                 teacher TEXT NOT NULL,
                 subject TEXT NOT NULL,
+                semester INTEGER,
+                academic_session TEXT,
+                branch TEXT,
                 q1 INTEGER NOT NULL,
                 q2 INTEGER NOT NULL,
                 q3 INTEGER NOT NULL,
@@ -56,6 +59,20 @@ def init_db():
                 FOREIGN KEY (session_id) REFERENCES feedback_sessions(id)
             )
         ''')
+        
+        # Migration: Add semester and academic_session columns if they don't exist
+        try:
+            cursor.execute('ALTER TABLE feedback ADD COLUMN semester INTEGER')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE feedback ADD COLUMN academic_session TEXT')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE feedback ADD COLUMN branch TEXT')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         conn.commit()
 
@@ -172,15 +189,15 @@ def get_completed_combo_indices(session_id: int) -> list:
 
 
 # Feedback operations
-def save_feedback(session_id: int, combo_index: int, teacher: str, subject: str, ratings: list, comment: str):
+def save_feedback(session_id: int, combo_index: int, teacher: str, subject: str, ratings: list, comment: str, semester: int = None, academic_session: str = None, branch: str = None):
     """Save feedback to database."""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO feedback 
-            (session_id, combo_index, teacher, subject, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, comment)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (session_id, combo_index, teacher, subject, *ratings, comment))
+            (session_id, combo_index, teacher, subject, semester, academic_session, branch, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, comment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (session_id, combo_index, teacher, subject, semester, academic_session, branch, *ratings, comment))
         conn.commit()
 
 

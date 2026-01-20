@@ -1017,3 +1017,73 @@ footer p {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* Semester & Session Badge */
+.semester-session-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(139, 92, 246, 0.15));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-small);
+    padding: 0.75rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+}
+
+.badge-semester {
+    color: var(--primary);
+}
+
+.badge-divider {
+    color: var(--text-muted);
+}
+
+.badge-session {
+    color: var(--secondary);
+}
+
+.badge-branch {
+    color: var(--success);
+    font-weight: 700;
+}
+
+/* Academic Period Card (Admin Dashboard) */
+.academic-period-card {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(139, 92, 246, 0.1));
+    border-left: 4px solid var(--primary);
+}
+
+.academic-period-display {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.period-icon {
+    font-size: 2.5rem;
+}
+
+.period-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.period-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.period-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}

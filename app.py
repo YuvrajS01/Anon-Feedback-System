@@ -27,6 +27,7 @@ from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 
 import config
+from config import load_semester_session
 from database import (
     init_db, validate_token, mark_token_used, save_feedback,
     get_token_stats, get_all_feedback, get_feedback_by_teacher,
@@ -62,6 +63,11 @@ def admin_required(f):
 def get_current_combos():
     """Get current teacher-subject combos (reload from config for live updates)."""
     return config.load_combos()
+
+
+def get_current_semester_session():
+    """Get current semester and session (reload from config for live updates)."""
+    return load_semester_session()
 
 
 # =============================================================================
@@ -146,6 +152,7 @@ def feedback_step(index):
         return redirect(url_for('thankyou'))
     
     current_combo = combos[index]
+    semester_session = get_current_semester_session()
     
     return render_template(
         'feedback_step.html',
@@ -153,7 +160,10 @@ def feedback_step(index):
         combo_index=index,
         total_combos=len(combos),
         completed_count=len(completed),
-        questions=config.QUESTIONS
+        questions=config.QUESTIONS,
+        semester=semester_session['semester'],
+        session=semester_session['session'],
+        branch=semester_session['branch']
     )
 
 
@@ -188,8 +198,14 @@ def submit_step(index):
             flash(f'Please provide a valid rating (1-10) for all questions.', 'error')
             return redirect(url_for('feedback_step', index=index))
     
-    # Save feedback
-    save_feedback(session_id, index, teacher, subject, ratings, comment)
+    # Save feedback with semester/session/branch
+    semester_session = get_current_semester_session()
+    save_feedback(
+        session_id, index, teacher, subject, ratings, comment,
+        semester=semester_session['semester'],
+        academic_session=semester_session['session'],
+        branch=semester_session['branch']
+    )
     
     # Update session progress
     completed = get_completed_combo_indices(session_id)
@@ -260,6 +276,9 @@ def admin_dashboard():
     teachers = list(set(c['teacher'] for c in combos))
     subjects = list(set(c['subject'] for c in combos))
     
+    # Get current semester/session for display
+    semester_session = get_current_semester_session()
+    
     return render_template(
         'admin_dashboard.html',
         token_stats=token_stats,
@@ -269,7 +288,10 @@ def admin_dashboard():
         questions=config.QUESTIONS,
         teachers=teachers,
         subjects=subjects,
-        combos=combos
+        combos=combos,
+        semester=semester_session['semester'],
+        session=semester_session['session'],
+        branch=semester_session['branch']
     )
 
 
@@ -285,7 +307,7 @@ def create_excel_workbook(feedback_data: list, title: str) -> BytesIO:
     
     # Headers
     headers = [
-        'Teacher', 'Subject',
+        'Teacher', 'Subject', 'Semester', 'Session', 'Branch',
         'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10',
         'Comment', 'Submitted At'
     ]
@@ -300,10 +322,13 @@ def create_excel_workbook(feedback_data: list, title: str) -> BytesIO:
     for row_idx, entry in enumerate(feedback_data, 2):
         ws.cell(row=row_idx, column=1, value=entry['teacher'])
         ws.cell(row=row_idx, column=2, value=entry['subject'])
+        ws.cell(row=row_idx, column=3, value=entry.get('semester', ''))
+        ws.cell(row=row_idx, column=4, value=entry.get('academic_session', ''))
+        ws.cell(row=row_idx, column=5, value=entry.get('branch', ''))
         for q in range(1, 11):
-            ws.cell(row=row_idx, column=q + 2, value=entry[f'q{q}'])
-        ws.cell(row=row_idx, column=13, value=entry.get('comment', ''))
-        ws.cell(row=row_idx, column=14, value=entry.get('submitted_at', ''))
+            ws.cell(row=row_idx, column=q + 5, value=entry[f'q{q}'])
+        ws.cell(row=row_idx, column=16, value=entry.get('comment', ''))
+        ws.cell(row=row_idx, column=17, value=entry.get('submitted_at', ''))
     
     # Auto-adjust column widths
     for col in range(1, len(headers) + 1):

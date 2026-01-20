@@ -30,7 +30,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
 from database import init_db, add_tokens, get_token_stats, reset_database
-from config import CONFIG_FILE, load_combos, save_combos, DATABASE_PATH
+from config import CONFIG_FILE, load_combos, save_combos, DATABASE_PATH, load_semester_session, save_semester_session, AVAILABLE_BRANCHES
 
 
 class ModernStyle:
@@ -200,6 +200,9 @@ class ControlPanel:
         # === Server Status Section ===
         self.create_server_section(scrollable_frame)
         
+        # === Academic Period Section ===
+        self.create_academic_period_section(scrollable_frame)
+        
         # === Teacher-Subject Combos Section ===
         self.create_combos_section(scrollable_frame)
         
@@ -278,6 +281,81 @@ class ControlPanel:
                              font=('Segoe UI', 10),
                              relief="flat", padx=15, pady=8, cursor="hand2")
         admin_btn.pack(side=tk.LEFT, padx=(10, 0))
+    
+    def create_academic_period_section(self, parent):
+        """Create academic period (semester/session/branch) section."""
+        card = self.create_card(parent, "🎓 Academic Period")
+        
+        # Load current values
+        current = load_semester_session()
+        
+        # Row 1: Semester and Session
+        sem_frame = ttk.Frame(card, style="Card.TFrame")
+        sem_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(sem_frame, text="Semester:", style="Card.TLabel").pack(side=tk.LEFT)
+        
+        self.semester_var = tk.StringVar(value=str(current['semester']))
+        semester_dropdown = ttk.Combobox(
+            sem_frame, 
+            textvariable=self.semester_var,
+            values=["1", "2", "3", "4", "5", "6", "7", "8"],
+            state="readonly",
+            width=5
+        )
+        semester_dropdown.pack(side=tk.LEFT, padx=(10, 20))
+        
+        ttk.Label(sem_frame, text="Session:", style="Card.TLabel").pack(side=tk.LEFT)
+        
+        self.session_entry = tk.Entry(sem_frame, width=12,
+                                      bg=ModernStyle.BG_INPUT,
+                                      fg=ModernStyle.TEXT_PRIMARY,
+                                      font=('Segoe UI', 10),
+                                      relief="flat",
+                                      insertbackground=ModernStyle.TEXT_PRIMARY)
+        self.session_entry.pack(side=tk.LEFT, padx=(10, 0))
+        self.session_entry.insert(0, current['session'])
+        
+        # Row 2: Branch
+        branch_frame = ttk.Frame(card, style="Card.TFrame")
+        branch_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(branch_frame, text="Branch:", style="Card.TLabel").pack(side=tk.LEFT)
+        
+        self.branch_var = tk.StringVar(value=current.get('branch', 'CSE'))
+        branch_dropdown = ttk.Combobox(
+            branch_frame, 
+            textvariable=self.branch_var,
+            values=AVAILABLE_BRANCHES,
+            state="readonly",
+            width=10
+        )
+        branch_dropdown.pack(side=tk.LEFT, padx=(10, 20))
+        
+        ttk.Label(branch_frame, text="(CSE, EEE, ME, CE, B.Arch, M.Tech)", style="Muted.TLabel").pack(side=tk.LEFT)
+        
+        # Current display
+        display_frame = ttk.Frame(card, style="Card.TFrame")
+        display_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.period_display_label = ttk.Label(
+            display_frame, 
+            text=f"Current: Semester {current['semester']} • {current['session']} • {current.get('branch', 'CSE')}",
+            style="Card.TLabel",
+            foreground=ModernStyle.ACCENT
+        )
+        self.period_display_label.pack(side=tk.LEFT)
+        
+        # Save button
+        btn_frame = ttk.Frame(card, style="Card.TFrame")
+        btn_frame.pack(fill=tk.X)
+        
+        save_btn = tk.Button(btn_frame, text="💾 Save Academic Period",
+                            command=self.save_academic_period,
+                            bg=ModernStyle.SUCCESS, fg="white",
+                            font=('Segoe UI', 10, 'bold'),
+                            relief="flat", padx=15, pady=8, cursor="hand2")
+        save_btn.pack(side=tk.LEFT)
     
     def create_combos_section(self, parent):
         """Create teacher-subject combos management section."""
@@ -513,6 +591,36 @@ class ControlPanel:
     def open_admin(self):
         """Open admin panel in browser."""
         webbrowser.open(f"http://{self.local_ip}:5000/admin")
+    
+    def save_academic_period(self):
+        """Save semester and session settings."""
+        try:
+            semester = int(self.semester_var.get())
+            if semester < 1 or semester > 8:
+                raise ValueError("Invalid semester")
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please select a valid semester (1-8).")
+            return
+        
+        session = self.session_entry.get().strip()
+        if not session:
+            messagebox.showerror("Invalid Input", "Please enter a session (e.g., 2022-26).")
+            return
+        
+        branch = self.branch_var.get()
+        if not branch:
+            messagebox.showerror("Invalid Input", "Please select a branch.")
+            return
+        
+        # Save to config
+        save_semester_session(semester, session, branch)
+        
+        # Update display
+        self.period_display_label.config(
+            text=f"Current: Semester {semester} • {session} • {branch}"
+        )
+        
+        messagebox.showinfo("Saved", f"Academic period updated:\nSemester {semester} • {session} • {branch}")
     
     def refresh_combos(self):
         """Refresh combo list from config."""

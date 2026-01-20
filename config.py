@@ -24,6 +24,14 @@ DEFAULT_TEACHER_SUBJECT_COMBOS = [
     {"teacher": "Dr. Patel", "subject": "Chemistry"},
 ]
 
+# Default semester and session values
+DEFAULT_SEMESTER = 1
+DEFAULT_SESSION = "2024-28"
+DEFAULT_BRANCH = "CSE"
+
+# Available branches
+AVAILABLE_BRANCHES = ["CSE", "EEE", "ME", "CE", "B.Arch", "M.Tech"]
+
 def load_combos():
     """Load teacher-subject combos from config file or use defaults."""
     if os.path.exists(CONFIG_FILE):
@@ -46,6 +54,40 @@ def save_combos(combos):
             pass
     
     config['teacher_subject_combos'] = combos
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+
+
+def load_semester_session():
+    """Load semester, session, and branch from config file or use defaults."""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                return {
+                    'semester': config.get('semester', DEFAULT_SEMESTER),
+                    'session': config.get('session', DEFAULT_SESSION),
+                    'branch': config.get('branch', DEFAULT_BRANCH)
+                }
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {'semester': DEFAULT_SEMESTER, 'session': DEFAULT_SESSION, 'branch': DEFAULT_BRANCH}
+
+
+def save_semester_session(semester: int, session: str, branch: str = None):
+    """Save semester, session, and branch to config file."""
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    
+    config['semester'] = semester
+    config['session'] = session
+    if branch:
+        config['branch'] = branch
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
 

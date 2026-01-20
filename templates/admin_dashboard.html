@@ -9,6 +9,17 @@
         <a href="{{ url_for('admin_logout') }}" class="btn btn-secondary btn-small">Logout</a>
     </div>
 
+    <!-- Current Academic Period -->
+    <div class="card academic-period-card">
+        <div class="academic-period-display">
+            <span class="period-icon">🎓</span>
+            <div class="period-info">
+                <span class="period-label">Current Feedback Period</span>
+                <span class="period-value">Semester {{ semester }} • {{ session }} • {{ branch }}</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Token & Session Statistics -->
     <div class="card">
         <h3>Statistics</h3>
