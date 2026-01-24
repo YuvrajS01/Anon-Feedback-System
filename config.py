@@ -91,6 +91,91 @@ def save_semester_session(semester: int, session: str, branch: str = None):
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=2)
 
+
+# =============================================================================
+# Template Management Functions
+# =============================================================================
+
+def load_templates():
+    """Load all templates from config file."""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                return config.get('templates', {})
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+
+def get_template(name: str):
+    """Get a specific template by name."""
+    templates = load_templates()
+    return templates.get(name)
+
+
+def save_template(name: str, semester: int, session: str, branch: str, combos: list):
+    """Save a new template with the given configuration."""
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    
+    if 'templates' not in config:
+        config['templates'] = {}
+    
+    config['templates'][name] = {
+        'semester': semester,
+        'session': session,
+        'branch': branch,
+        'teacher_subject_combos': combos
+    }
+    
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+
+
+def delete_template(name: str):
+    """Delete a template by name."""
+    if not os.path.exists(CONFIG_FILE):
+        return False
+    
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return False
+    
+    if 'templates' not in config or name not in config['templates']:
+        return False
+    
+    del config['templates'][name]
+    
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=2)
+    
+    return True
+
+
+def apply_template(name: str):
+    """Apply a template - sets semester, session, branch, and combos."""
+    template = get_template(name)
+    if not template:
+        return False
+    
+    # Save the template values as current config
+    save_semester_session(
+        template['semester'],
+        template['session'],
+        template['branch']
+    )
+    save_combos(template['teacher_subject_combos'])
+    
+    return True
+
 # Dynamic property to get current combos
 TEACHER_SUBJECT_COMBOS = load_combos()
 

@@ -30,7 +30,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
 from database import init_db, add_tokens, get_token_stats, reset_database
-from config import CONFIG_FILE, load_combos, save_combos, DATABASE_PATH, load_semester_session, save_semester_session, AVAILABLE_BRANCHES
+from config import CONFIG_FILE, load_combos, save_combos, DATABASE_PATH, load_semester_session, save_semester_session, AVAILABLE_BRANCHES, load_templates, save_template, delete_template, apply_template
 
 
 class ModernStyle:
@@ -203,6 +203,9 @@ class ControlPanel:
         # === Academic Period Section ===
         self.create_academic_period_section(scrollable_frame)
         
+        # === Template Management Section ===
+        self.create_template_section(scrollable_frame)
+        
         # === Teacher-Subject Combos Section ===
         self.create_combos_section(scrollable_frame)
         
@@ -356,6 +359,79 @@ class ControlPanel:
                             font=('Segoe UI', 10, 'bold'),
                             relief="flat", padx=15, pady=8, cursor="hand2")
         save_btn.pack(side=tk.LEFT)
+    
+    def create_template_section(self, parent):
+        """Create template management section."""
+        card = self.create_card(parent, "📋 Templates")
+        
+        # Template selection row
+        select_frame = ttk.Frame(card, style="Card.TFrame")
+        select_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(select_frame, text="Template:", style="Card.TLabel").pack(side=tk.LEFT)
+        
+        self.template_var = tk.StringVar()
+        self.template_dropdown = ttk.Combobox(
+            select_frame, 
+            textvariable=self.template_var,
+            values=list(load_templates().keys()),
+            state="readonly",
+            width=30
+        )
+        self.template_dropdown.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Load/Delete buttons row
+        action_frame = ttk.Frame(card, style="Card.TFrame")
+        action_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        load_btn = tk.Button(action_frame, text="🔄 Load Template",
+                            command=self.load_template,
+                            bg=ModernStyle.ACCENT, fg="white",
+                            font=('Segoe UI', 10, 'bold'),
+                            relief="flat", padx=15, pady=8, cursor="hand2")
+        load_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        delete_btn = tk.Button(action_frame, text="🗑 Delete",
+                              command=self.delete_template,
+                              bg=ModernStyle.ERROR, fg="white",
+                              font=('Segoe UI', 10),
+                              relief="flat", padx=12, pady=6, cursor="hand2")
+        delete_btn.pack(side=tk.LEFT)
+        
+        # Separator
+        separator = ttk.Frame(card, style="Card.TFrame", height=1)
+        separator.pack(fill=tk.X, pady=(5, 15))
+        
+        # Save template row
+        save_label_frame = ttk.Frame(card, style="Card.TFrame")
+        save_label_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(save_label_frame, text="Save current configuration as template:", 
+                  style="Muted.TLabel").pack(side=tk.LEFT)
+        
+        save_entry_frame = ttk.Frame(card, style="Card.TFrame")
+        save_entry_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(save_entry_frame, text="Name:", style="Card.TLabel").pack(side=tk.LEFT)
+        
+        self.template_name_entry = tk.Entry(save_entry_frame, width=25,
+                                           bg=ModernStyle.BG_INPUT,
+                                           fg=ModernStyle.TEXT_PRIMARY,
+                                           font=('Segoe UI', 10),
+                                           relief="flat",
+                                           insertbackground=ModernStyle.TEXT_PRIMARY)
+        self.template_name_entry.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Save button row
+        save_btn_frame = ttk.Frame(card, style="Card.TFrame")
+        save_btn_frame.pack(fill=tk.X)
+        
+        save_template_btn = tk.Button(save_btn_frame, text="💾 Save Current as Template",
+                                     command=self.save_current_as_template,
+                                     bg=ModernStyle.SUCCESS, fg="white",
+                                     font=('Segoe UI', 10, 'bold'),
+                                     relief="flat", padx=15, pady=8, cursor="hand2")
+        save_template_btn.pack(side=tk.LEFT)
     
     def create_combos_section(self, parent):
         """Create teacher-subject combos management section."""
@@ -622,6 +698,113 @@ class ControlPanel:
         
         messagebox.showinfo("Saved", f"Academic period updated:\nSemester {semester} • {session} • {branch}")
     
+    def refresh_templates(self):
+        """Refresh template dropdown from config."""
+        templates = load_templates()
+        self.template_dropdown['values'] = list(templates.keys())
+        if templates and not self.template_var.get():
+            self.template_dropdown.current(0)
+    
+    def load_template(self):
+        """Load and apply the selected template."""
+        template_name = self.template_var.get()
+        if not template_name:
+            messagebox.showwarning("Select Template", "Please select a template to load.")
+            return
+        
+        if apply_template(template_name):
+            # Reload the current values
+            current = load_semester_session()
+            
+            # Update semester dropdown
+            self.semester_var.set(str(current['semester']))
+            
+            # Update session entry
+            self.session_entry.delete(0, tk.END)
+            self.session_entry.insert(0, current['session'])
+            
+            # Update branch dropdown
+            self.branch_var.set(current.get('branch', 'CSE'))
+            
+            # Update period display
+            self.period_display_label.config(
+                text=f"Current: Semester {current['semester']} • {current['session']} • {current.get('branch', 'CSE')}"
+            )
+            
+            # Refresh combos list
+            self.refresh_combos()
+            
+            messagebox.showinfo("Template Loaded", f"Template '{template_name}' has been applied successfully.")
+        else:
+            messagebox.showerror("Error", f"Failed to load template '{template_name}'.")
+    
+    def delete_template(self):
+        """Delete the selected template."""
+        template_name = self.template_var.get()
+        if not template_name:
+            messagebox.showwarning("Select Template", "Please select a template to delete.")
+            return
+        
+        result = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete the template '{template_name}'?",
+            icon='warning'
+        )
+        
+        if result:
+            if delete_template(template_name):
+                self.template_var.set('')
+                self.refresh_templates()
+                messagebox.showinfo("Deleted", f"Template '{template_name}' has been deleted.")
+            else:
+                messagebox.showerror("Error", f"Failed to delete template '{template_name}'.")
+    
+    def save_current_as_template(self):
+        """Save the current configuration as a new template."""
+        template_name = self.template_name_entry.get().strip()
+        if not template_name:
+            messagebox.showwarning("Name Required", "Please enter a name for the template.")
+            return
+        
+        # Check if template already exists
+        templates = load_templates()
+        if template_name in templates:
+            result = messagebox.askyesno(
+                "Template Exists",
+                f"A template named '{template_name}' already exists. Overwrite?",
+                icon='warning'
+            )
+            if not result:
+                return
+        
+        try:
+            semester = int(self.semester_var.get())
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please select a valid semester.")
+            return
+        
+        session = self.session_entry.get().strip()
+        if not session:
+            messagebox.showerror("Invalid Input", "Please enter a session.")
+            return
+        
+        branch = self.branch_var.get()
+        if not branch:
+            messagebox.showerror("Invalid Input", "Please select a branch.")
+            return
+        
+        combos = load_combos()
+        
+        # Save the template
+        save_template(template_name, semester, session, branch, combos)
+        
+        # Clear the name entry and refresh dropdown
+        self.template_name_entry.delete(0, tk.END)
+        self.refresh_templates()
+        self.template_var.set(template_name)
+        
+        messagebox.showinfo("Saved", f"Template '{template_name}' has been saved successfully.")
+    
     def refresh_combos(self):
         """Refresh combo list from config."""
         self.combo_listbox.delete(0, tk.END)
@@ -736,6 +919,7 @@ class ControlPanel:
     def refresh_all(self):
         """Refresh all data displays."""
         self.refresh_combos()
+        self.refresh_templates()
         self.update_token_stats()
         self.update_server_status()
     
