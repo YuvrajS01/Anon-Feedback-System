@@ -11,26 +11,7 @@ Examples:
 """
 
 import argparse
-import random
-import string
-from database import init_db, add_tokens
-
-
-def generate_token(length: int = 6) -> str:
-    """Generate a random alphanumeric token."""
-    # Use uppercase letters and digits for readability
-    chars = string.ascii_uppercase + string.digits
-    # Exclude similar-looking characters (0, O, I, 1, L)
-    chars = chars.replace('0', '').replace('O', '').replace('I', '').replace('1', '').replace('L', '')
-    return ''.join(random.choices(chars, k=length))
-
-
-def generate_unique_tokens(count: int, length: int = 6) -> list:
-    """Generate a list of unique tokens."""
-    tokens = set()
-    while len(tokens) < count:
-        tokens.add(generate_token(length))
-    return list(tokens)
+from database import init_db, create_tokens
 
 
 def main():
@@ -53,6 +34,8 @@ def main():
         '--length', '-l',
         type=int,
         default=6,
+        choices=range(5, 13),
+        metavar='5-12',
         help='Length of each token (default: 6)'
     )
     
@@ -61,13 +44,10 @@ def main():
     # Initialize database
     init_db()
     
-    # Generate tokens
+    # Generate tokens (guaranteed new, never colliding with existing ones)
     print(f"Generating {args.count} tokens...")
-    tokens = generate_unique_tokens(args.count, args.length)
-    
-    # Add to database
-    added = add_tokens(tokens)
-    print(f"Added {added} new tokens to database.")
+    tokens = create_tokens(args.count, args.length)
+    print(f"Added {len(tokens)} new tokens to database.")
     
     # Display tokens
     print("\nGenerated Tokens:")

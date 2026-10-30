@@ -1,167 +1,81 @@
-# 📝 Anonymous Student Feedback System
+# Anonymous Student Feedback System
 
-A local-only, token-based anonymous feedback system for college environments. Students submit feedback using one-time tokens, and administrators can view analytics and export reports.
+A local-only, token-based feedback system for colleges. It runs on one laptop and students connect over the same Wi-Fi or hotspot. No internet is needed.
 
-## 🚀 Quick Start
+Each student gets a one-time token. They rate every teacher-subject pair for the current semester on 10 questions (1–10) and can add a comment. Administrators see live results, per-teacher reports and Excel exports.
 
-### 1. Install Dependencies
+## Quick start
 
 ```bash
-# Create virtual environment (recommended)
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install packages
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
+python control_panel.py           # GUI: start server, set up subjects, make tokens
+# or, without the GUI:
+python generate_tokens.py 60      # create 60 tokens
+python app.py                     # start the server on port 5000
 ```
 
-### 2. Generate Tokens
+The server prints the address students should open, for example `http://192.168.1.20:5000`.
 
-Generate one-time tokens for students:
+## Running a feedback round
+
+1. **Set the period.** In the Control Panel, choose the semester, session and branch, then add the teacher-subject pairs. Save the setup as a template to reuse it next term.
+2. **Set an admin password.** Use the *Admin Password* card. Until you do, the password is `admin123` and the dashboard shows a warning.
+3. **Make tokens.** Generate one per student, then click **Print Slips (QR)**. This opens a printable sheet of cut-out slips, each with a QR code that opens the form with the token already filled in.
+4. **Collect.** Students scan or type the URL, enter their token and rate each subject. If they close the tab they can resume with the same token. A token stops working once every subject is done.
+5. **Review.** Open `/admin` to see response counts, average ratings by question, and a report for each teacher with score distributions and comments. Results are filtered by academic period and you can switch periods from the dropdown.
+6. **Export.** Download Excel files for everything, one teacher or one subject. Each workbook has a *Summary* sheet (averages) and a *Responses* sheet (one row per submission).
+
+## Privacy
+
+- Feedback rows contain **no token and no session link**. Progress is tracked on the token itself, and token rows have no timestamps, so a response can't be matched to the student who gave it.
+- No IP addresses, user agents or access logs are recorded. Login throttling is global on purpose, so it doesn't track who is connecting.
+- Students are asked not to put their name in comments. Comments are shown to admins exactly as written.
+
+## Configuration
+
+| Setting | Where |
+|---|---|
+| Teacher-subject pairs, semester, session, branch, templates | Control Panel (saved to `system_config.json`) |
+| Admin password | Control Panel, or the `ADMIN_PASSWORD` env var (overrides the saved one) |
+| Questions | `QUESTIONS` in `config.py` (must stay at exactly 10) |
+| Port | `PORT` env var (default `5000`) |
+| Session secret | Generated automatically into `.secret_key`, or set `SECRET_KEY` |
+| Database / config paths | `FEEDBACK_DB`, `FEEDBACK_CONFIG` env vars |
+
+`system_config.example.json` shows the config format. The live `system_config.json`, `feedback.db` and token files are git-ignored because they contain real responses and valid tokens.
+
+## Project layout
+
+```
+app.py               Flask routes: student flow, admin dashboard/reports, exports
+database.py          SQLite schema, migrations and queries
+config.py            Settings, config-file helpers, admin password, LAN IP
+control_panel.py     Tkinter GUI for running a feedback round
+generate_tokens.py   Command-line token generator
+templates/           Jinja templates (student, admin, printable slips)
+static/              style.css, app.js and bundled fonts (Atkinson Hyperlegible Next/Mono, OFL)
+tests/               pytest suite
+```
+
+## Development
 
 ```bash
-# Generate 50 tokens
-python generate_tokens.py 50
-
-# Generate 100 tokens and export to file
-python generate_tokens.py 100 --export tokens.txt
+pip install -r requirements-dev.txt
+python -m pytest
 ```
 
-### 3. Run the Server
+Tests use a temporary database and config file. They never touch your real data.
 
-```bash
-python app.py
-```
+### Upgrading from an older version
 
-The server will start on `http://0.0.0.0:5000`. You'll see:
-- **Local URL**: `http://127.0.0.1:5000`
-- **Network URL**: `http://<your-ip>:5000` (share with students)
-- **Admin Panel**: `http://127.0.0.1:5000/admin`
+On first start, `init_db()` migrates older databases automatically. It moves in-progress state onto the token rows, removes the `session_id` link from feedback, and drops the `feedback_sessions` table. **This permanently removes the link between tokens and responses.** Make a copy of `feedback.db` first if you need to keep the old file.
 
-## 📁 Project Structure
+## Troubleshooting
 
-```
-Local-Feedback-System/
-├── app.py              # Main Flask application
-├── config.py           # Configuration (teachers, subjects, questions)
-├── database.py         # SQLite database operations
-├── generate_tokens.py  # Token generation script
-├── requirements.txt    # Python dependencies
-├── feedback.db         # SQLite database (auto-created)
-├── templates/          # HTML templates
-│   ├── base.html
-│   ├── index.html
-│   ├── feedback.html
-│   ├── thankyou.html
-│   ├── admin_login.html
-│   └── admin_dashboard.html
-└── static/
-    └── style.css       # Mobile-first CSS
-```
-
-## ⚙️ Configuration
-
-Edit `config.py` to customize:
-
-```python
-# Admin password (or set ADMIN_PASSWORD env var)
-ADMIN_PASSWORD = 'admin123'
-
-# List of teachers
-TEACHERS = [
-    "Dr. Sharma",
-    "Prof. Gupta",
-    # Add more...
-]
-
-# List of subjects
-SUBJECTS = [
-    "Mathematics",
-    "Physics",
-    # Add more...
-]
-
-# Feedback questions (10 questions)
-QUESTIONS = [
-    "Clarity of explanation",
-    "Subject knowledge",
-    # Edit as needed...
-]
-```
-
-## 👨‍🎓 Student Flow
-
-1. Visit `http://<server-ip>:5000`
-2. Enter the one-time token
-3. Select teacher and subject
-4. Rate 10 questions (1-10 scale)
-5. Add optional comments
-6. Submit → See thank you page
-
-## 👩‍💼 Admin Flow
-
-1. Visit `http://<server-ip>:5000/admin`
-2. Enter admin password (default: `admin123`)
-3. View dashboard:
-   - Token statistics (total, used, unused)
-   - Teacher-wise feedback summary
-   - Average ratings per question
-4. Export reports as Excel:
-   - All feedback
-   - Per teacher
-   - Per subject
-
-## 🔒 Privacy Features
-
-- ✅ One-time tokens (cannot be reused)
-- ✅ No IP address logging
-- ✅ No cookies/session tracking for students
-- ✅ Tokens not stored with feedback
-- ✅ Flask access logs disabled
-
-## 🛠️ Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ADMIN_PASSWORD` | Admin login password | `admin123` |
-| `SECRET_KEY` | Flask session secret | Random (auto-generated) |
-
-## 📊 Excel Reports
-
-Exported Excel files include:
-- Bold headers
-- Auto-adjusted column widths
-- Columns: Teacher | Subject | Q1-Q10 | Comment | Submitted At
-
-## 🧪 Testing
-
-```bash
-# Generate test tokens
-python generate_tokens.py 5
-
-# Run the server
-python app.py
-
-# Test endpoints:
-# - Submit feedback with a token
-# - Try reusing the same token (should fail)
-# - Login to admin and export Excel
-```
-
-## 🔧 Troubleshooting
-
-**Port already in use:**
-```bash
-# Kill process on port 5000
-kill -9 $(lsof -t -i:5000)
-```
-
-**Reset database:**
-```bash
-rm feedback.db
-python app.py  # Will create fresh database
-```
-
----
-
-Made with ❤️ for anonymous student feedback
+- **Students can't connect.** Make sure they're on the same network and that your firewall allows the port (Linux: `sudo ufw allow 5000`; on Windows, allow Python when prompted).
+- **Port already in use.** The Control Panel checks this and tells you. From a terminal: `lsof -ti:5000 | xargs kill`.
+- **The server stopped right after starting.** The Control Panel shows the error. The full output is in `server.log`.
+- **Start a fresh term.** Use *Reset Database* in the Control Panel. It deletes all tokens and feedback, so export first.

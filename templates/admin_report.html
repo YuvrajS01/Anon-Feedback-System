@@ -1,0 +1,84 @@
+{% extends "admin_base.html" %}
+{% from "partials/macros.html" import icon, score, period_picker %}
+
+{% block title %}{{ teacher }}, {{ subject }} — Student Feedback{% endblock %}
+
+{% block content %}
+<a class="crumb no-print" href="{{ url_for('admin_dashboard', period=selected_period) }}">{{ icon('back', 14) }} All results</a>
+
+<div class="page-head">
+    <div>
+        <h1>{{ teacher }}</h1>
+        <p>{{ subject }}, {% if period %}{{ period_label(period) }}{% else %}all periods{% endif %}</p>
+    </div>
+    <div class="actions no-print">
+        {{ period_picker(periods, selected_period) }}
+        {% if averages.responses %}
+        <a class="btn" href="{{ url_for('export_teacher', teacher_name=teacher, period=selected_period) }}">{{ icon('download') }} Download Excel</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if not averages.responses %}
+<div class="empty">
+    <strong>No responses for this period</strong>
+    Pick another period above, or check back once students have rated {{ subject }}.
+</div>
+{% else %}
+<dl class="figures">
+    <div class="figure">
+        <dt>Average rating</dt>
+        <dd>{{ '%.1f'|format(averages.overall) }} <small>out of 10</small></dd>
+    </div>
+    <div class="figure">
+        <dt>Responses</dt>
+        <dd>{{ averages.responses }}</dd>
+        <div class="sub">{{ comments|length }} with a comment</div>
+    </div>
+    <div class="figure">
+        <dt>Rated highest</dt>
+        <dd style="font-size: var(--t-18); letter-spacing: 0; margin-top: 8px;">{{ strongest }}</dd>
+    </div>
+    <div class="figure">
+        <dt>Rated lowest</dt>
+        <dd style="font-size: var(--t-18); letter-spacing: 0; margin-top: 8px;">{{ weakest }}</dd>
+    </div>
+</dl>
+
+<div class="split">
+    <section class="section">
+        <div class="section-head">
+            <h2>Questions</h2>
+            <p>Bars show how many students chose each score, 1 to 10</p>
+        </div>
+        {% for question in questions %}
+        {% set q = 'q' ~ loop.index %}
+        {% set peak = distribution[q]|max %}
+        <div class="dist-row">
+            <span>{{ question }}</span>
+            <div class="dist" role="img" aria-label="{% for c in distribution[q] %}{{ loop.index }}: {{ c }}{{ ', ' if not loop.last }}{% endfor %}">
+                {% for count in distribution[q] %}
+                <i class="{{ 'peak' if count and count == peak }}" style="height: {{ (count / peak * 100) if peak else 0 }}%" title="{{ count }} chose {{ loop.index }}"></i>
+                {% endfor %}
+            </div>
+            {{ score(averages[q]) }}
+        </div>
+        {% endfor %}
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2>Comments</h2>
+            <p>{{ comments|length }} written</p>
+        </div>
+        {% if comments %}
+        <ul class="remarks">
+            {% for c in comments %}<li>{{ c }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty">Nobody left a comment for this subject.</p>
+        {% endif %}
+    </section>
+</div>
+{% endif %}
+{% endblock %}

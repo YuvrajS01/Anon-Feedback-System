@@ -1,28 +1,27 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import mark, notices %}
 
-{% block title %}Admin Login - Student Feedback{% endblock %}
+{% block title %}Admin sign in — Student Feedback{% endblock %}
 
-{% block content %}
-<div class="card login-card">
-    <h2>🔐 Admin Login</h2>
-    <p class="subtitle">Enter your admin password to access the dashboard.</p>
-
-    <form action="{{ url_for('admin_login') }}" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" placeholder="Enter admin password"
-                autocomplete="current-password" autofocus required>
+{% block body %}
+<main>
+    <div class="frame">
+        <div class="login">
+            {{ mark(36) }}
+            <h1>Sign in to see results</h1>
+            <p>Admin access for Student Feedback.</p>
+            {{ notices() }}
+            <form method="POST" data-once>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label for="password">Admin password</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" autofocus required>
+                <button type="submit" class="btn btn-primary btn-large">Sign in</button>
+            </form>
+            {% if default_password %}
+            <p class="hint">First time? The password is <code>admin123</code> until you set your own in the Control Panel.</p>
+            {% endif %}
+            <p class="hint"><a href="{{ url_for('index') }}">Go to the student page</a></p>
         </div>
-
-        <button type="submit" class="btn btn-primary btn-large">
-            Login →
-        </button>
-    </form>
-
-    <a href="{{ url_for('index') }}" class="back-link">
-        ← Back to Feedback Form
-    </a>
-</div>
+    </div>
+</main>
 {% endblock %}

@@ -1,31 +1,27 @@
-{% extends "base.html" %}
+{% extends "student_base.html" %}
 
-{% block title %}Start - Feedback System{% endblock %}
+{% block title %}Start — Student Feedback{% endblock %}
 
 {% block content %}
-<div class="token-card">
-    <div class="card">
-        <h2 style="margin-bottom: 1rem; text-align: center;">Welcome</h2>
-        <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem;">
-            Please enter your access token to begin providing anonymous feedback.
-        </p>
-
-        <form action="{{ url_for('verify_token') }}" method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-            <div class="token-input-group">
-                <input type="text" name="token" class="token-input" placeholder="TOKEN" maxlength="10" required
-                    autofocus autocomplete="off">
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-large">
-                Start Session →
-            </button>
-        </form>
-    </div>
-
-    <div style="margin-top: 2rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">
-        If you don't have a token, please contact your administrator.
-    </div>
+<div class="intro">
+    <h1>Rate this semester's teaching</h1>
+    <p>Type the code from your slip. You'll rate each of your subjects on ten questions, which takes about two minutes per subject.</p>
 </div>
+
+<form class="token-form" action="{{ url_for('verify_token') }}" method="POST" data-once>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="token">Code from your slip</label>
+    <input type="text" id="token" name="token" class="token-field" placeholder="K7XM4P"
+        value="{{ prefill }}" maxlength="12" required autofocus autocomplete="off"
+        autocapitalize="characters" spellcheck="false" aria-describedby="token-hint">
+    <p class="hint" id="token-hint" style="margin-top: 6px;">Six letters and numbers. Capitals don't matter.</p>
+    <button type="submit" class="btn btn-primary btn-large">Start rating</button>
+</form>
+
+<section class="assurances">
+    <h2>Who sees your answers</h2>
+    <p>Your code isn't linked to your name, roll number or phone. Answers are saved separately from codes, so nobody can tell which ones are yours.</p>
+    <p>If you close this page, enter the same code again to carry on where you stopped.</p>
+    <p>No code? Ask your class coordinator for a slip.</p>
+</section>
 {% endblock %}

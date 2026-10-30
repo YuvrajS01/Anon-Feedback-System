@@ -1,24 +1,12 @@
-{% extends "base.html" %}
+{% extends "student_base.html" %}
+{% from "partials/macros.html" import icon %}
 
-{% block title %}Thank You - Student Feedback{% endblock %}
+{% block title %}Done — Student Feedback{% endblock %}
 
 {% block content %}
-<div class="card thankyou-card">
-    <div class="success-icon">✓</div>
-
-    <h2 style="font-size: 2.25rem; margin-bottom: 1rem;">Thank You!</h2>
-
-    <div class="thankyou-message">
-        <p style="margin-bottom: 1rem;">Your feedback has been submitted successfully.</p>
-        <p>Your responses will help improve the teaching quality at our institution.</p>
-    </div>
-
-    <div class="privacy-reminder">
-        🔒 Your feedback remains completely anonymous. No personal information was collected.
-    </div>
-
-    <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-top: 2rem;">
-        ← Submit Another Response
-    </a>
+<div class="finished">
+    {{ icon('done', 48) }}
+    <h1>Your feedback is saved</h1>
+    <p>Thanks for taking the time. Your code is now used up, so you can close this page.</p>
 </div>
 {% endblock %}

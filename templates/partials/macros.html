@@ -1,0 +1,66 @@
+{# Icons: 24px grid, 2px stroke, drawn inline so nothing loads from the network #}
+{% set ICONS = {
+    'check': '<path d="M20 6 9 17l-5-5"/>',
+    'alert': '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/>',
+    'lock': '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    'copy': '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
+    'download': '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+    'print': '<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/>',
+    'back': '<path d="M15 18l-6-6 6-6"/>',
+    'done': '<circle cx="12" cy="12" r="10"/><path d="m8 12.5 3 3 5-6"/>',
+} %}
+
+{% macro icon(name, size=16) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ICONS[name]|safe }}</svg>
+{%- endmacro %}
+
+{# The brand mark is a marked answer bubble #}
+{% macro mark(size=28) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 28 28" aria-hidden="true">
+    <circle cx="14" cy="14" r="12" fill="none" stroke="var(--ink)" stroke-width="2"/>
+    <circle cx="14" cy="14" r="7.5" fill="var(--royal)"/>
+</svg>
+{%- endmacro %}
+
+{% macro tone(value) -%}
+{%- if value is none -%}{%- elif value >= 7.5 -%}good{%- elif value >= 5 -%}mid{%- else -%}bad{%- endif -%}
+{%- endmacro %}
+
+{# Score out of 10 shown as ten segments, echoing the ten answer bubbles #}
+{% macro score(value) -%}
+{%- if value is none -%}<span class="hint">No ratings</span>{%- else -%}
+<span class="score {{ tone(value) }}" title="{{ '%.2f'|format(value) }} out of 10">
+    <b>{{ '%.1f'|format(value) }}</b>
+    <span class="marks" aria-hidden="true">{% for i in range(10) %}<i class="{{ 'on' if i < (value|round|int) }}"></i>{% endfor %}</span>
+</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro period_picker(periods, selected) -%}
+<form class="no-print" method="GET">
+    {% for key, val in request.args.items() if key != 'period' %}
+    <input type="hidden" name="{{ key }}" value="{{ val }}">
+    {% endfor %}
+    <label class="visually-hidden" for="period">Show results for</label>
+    <select id="period" name="period" data-autosubmit>
+        {% for p in periods %}
+        <option value="{{ period_value(p) }}" {% if period_value(p) == selected %}selected{% endif %}>
+            {{ period_label(p) }}{% if p.responses is defined %} ({{ p.responses }} {{ 'response' if p.responses == 1 else 'responses' }}){% endif %}
+        </option>
+        {% endfor %}
+        <option value="all" {% if selected == 'all' %}selected{% endif %}>All periods</option>
+    </select>
+    <noscript><button class="btn btn-small" type="submit">Show</button></noscript>
+</form>
+{%- endmacro %}
+
+{% macro notices() -%}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for category, message in messages %}
+<div class="notice notice-{{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">
+    {{ icon('alert' if category == 'error' else 'check') }}
+    <span>{{ message }}</span>
+</div>
+{% endfor %}
+{% endwith %}
+{%- endmacro %}

@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.pytest_cache/
+
+# Live data: never commit (student responses and valid tokens)
+feedback.db
+*.db-wal
+*.db-shm
+tokens_*.txt
+system_config.json
+
+# Secrets and logs
+.secret_key
+server.log
+.config-*.json

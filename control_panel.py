@@ -13,12 +13,8 @@ Run with: python control_panel.py
 
 import os
 import sys
-import json
 import socket
 import signal
-import random
-import string
-import threading
 import subprocess
 import webbrowser
 import tkinter as tk
@@ -29,8 +25,14 @@ from datetime import datetime
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
-from database import init_db, add_tokens, get_token_stats, reset_database
-from config import CONFIG_FILE, load_combos, save_combos, DATABASE_PATH, load_semester_session, save_semester_session, AVAILABLE_BRANCHES, load_templates, save_template, delete_template, apply_template
+from database import init_db, create_tokens, get_unused_tokens, get_token_stats, reset_database
+from config import (
+    load_combos, save_combos, DATABASE_PATH, PORT, load_semester_session, save_semester_session,
+    AVAILABLE_BRANCHES, load_templates, save_template, delete_template, apply_template,
+    get_local_ip, set_admin_password, is_default_admin_password
+)
+
+SERVER_LOG = os.path.join(PROJECT_ROOT, 'server.log')
 
 
 class ModernStyle:
@@ -178,7 +180,7 @@ class ControlPanel:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        content_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
         # Pack scrollbar and canvas
@@ -187,8 +189,18 @@ class ControlPanel:
         
         # Bind mousewheel
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            # Windows/macOS report delta; X11 (Linux) sends Button-4/5 instead
+            if event.num == 4:
+                canvas.yview_scroll(-3, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(3, "units")
+            else:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        canvas.bind_all("<Button-4>", _on_mousewheel)
+        canvas.bind_all("<Button-5>", _on_mousewheel)
+        # Keep the content as wide as the window
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(content_window, width=e.width))
         
         # Title
         title_frame = ttk.Frame(scrollable_frame, style="Dark.TFrame")
@@ -211,6 +223,9 @@ class ControlPanel:
         
         # === Token Management Section ===
         self.create_tokens_section(scrollable_frame)
+        
+        # === Admin Password Section ===
+        self.create_password_section(scrollable_frame)
         
         # === Database Section ===
         self.create_database_section(scrollable_frame)
@@ -245,10 +260,11 @@ class ControlPanel:
         url_frame = ttk.Frame(card, style="Card.TFrame")
         url_frame.pack(fill=tk.X, pady=(0, 10))
         
-        self.local_ip = self.get_local_ip()
+        self.local_ip = get_local_ip()
+        self.base_url = f"http://{self.local_ip}:{PORT}"
         
-        ttk.Label(url_frame, text="Local URL:", style="Muted.TLabel").pack(side=tk.LEFT)
-        self.url_label = ttk.Label(url_frame, text=f"http://{self.local_ip}:5000", 
+        ttk.Label(url_frame, text="Student URL:", style="Muted.TLabel").pack(side=tk.LEFT)
+        self.url_label = ttk.Label(url_frame, text=self.base_url, 
                                    style="Card.TLabel", foreground=ModernStyle.ACCENT)
         self.url_label.pack(side=tk.LEFT, padx=(10, 0))
         
@@ -513,6 +529,10 @@ class ControlPanel:
                                            style="Card.TLabel", foreground=ModernStyle.SUCCESS)
         self.tokens_used_label.pack(side=tk.LEFT, padx=(20, 0))
         
+        self.tokens_progress_label = ttk.Label(stats_frame, text="In progress: 0",
+                                               style="Card.TLabel", foreground=ModernStyle.ACCENT)
+        self.tokens_progress_label.pack(side=tk.LEFT, padx=(20, 0))
+        
         self.tokens_unused_label = ttk.Label(stats_frame, text="Unused: 0",
                                              style="Card.TLabel", foreground=ModernStyle.WARNING)
         self.tokens_unused_label.pack(side=tk.LEFT, padx=(20, 0))
@@ -546,12 +566,55 @@ class ControlPanel:
                            relief="flat", padx=15, pady=8, cursor="hand2")
         gen_btn.pack(side=tk.LEFT, padx=(0, 10))
         
-        export_btn = tk.Button(token_btn_frame, text="📄 Export to File",
+        export_btn = tk.Button(token_btn_frame, text="📄 Export Unused to File",
                               command=self.export_tokens,
                               bg=ModernStyle.BG_INPUT, fg="white",
                               font=('Segoe UI', 10),
                               relief="flat", padx=12, pady=6, cursor="hand2")
-        export_btn.pack(side=tk.LEFT)
+        export_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        print_btn = tk.Button(token_btn_frame, text="🖨 Print Slips (QR)",
+                             command=lambda: webbrowser.open(f"{self.base_url}/admin/tokens/print"),
+                             bg=ModernStyle.BG_INPUT, fg="white",
+                             font=('Segoe UI', 10),
+                             relief="flat", padx=12, pady=6, cursor="hand2")
+        print_btn.pack(side=tk.LEFT)
+    
+    def create_password_section(self, parent):
+        """Create admin password section."""
+        card = self.create_card(parent, "🔑 Admin Password")
+        
+        self.password_status_label = ttk.Label(card, text="", style="Muted.TLabel")
+        self.password_status_label.pack(anchor=tk.W, pady=(0, 10))
+        self.update_password_status()
+        
+        row = ttk.Frame(card, style="Card.TFrame")
+        row.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(row, text="New password:", style="Card.TLabel").pack(side=tk.LEFT)
+        self.password_entry = tk.Entry(row, width=20, show="•",
+                                       bg=ModernStyle.BG_INPUT,
+                                       fg=ModernStyle.TEXT_PRIMARY,
+                                       font=('Segoe UI', 10),
+                                       relief="flat",
+                                       insertbackground=ModernStyle.TEXT_PRIMARY)
+        self.password_entry.pack(side=tk.LEFT, padx=(10, 15))
+        
+        ttk.Label(row, text="Confirm:", style="Card.TLabel").pack(side=tk.LEFT)
+        self.password_confirm_entry = tk.Entry(row, width=20, show="•",
+                                               bg=ModernStyle.BG_INPUT,
+                                               fg=ModernStyle.TEXT_PRIMARY,
+                                               font=('Segoe UI', 10),
+                                               relief="flat",
+                                               insertbackground=ModernStyle.TEXT_PRIMARY)
+        self.password_confirm_entry.pack(side=tk.LEFT, padx=(10, 0))
+        
+        save_btn = tk.Button(card, text="💾 Set Password",
+                            command=self.save_admin_password,
+                            bg=ModernStyle.SUCCESS, fg="white",
+                            font=('Segoe UI', 10, 'bold'),
+                            relief="flat", padx=15, pady=8, cursor="hand2")
+        save_btn.pack(anchor=tk.W)
     
     def create_database_section(self, parent):
         """Create database management section."""
@@ -584,14 +647,6 @@ class ControlPanel:
     
     # === Helper Methods ===
     
-    def get_local_ip(self):
-        """Get local IP address."""
-        try:
-            hostname = socket.gethostname()
-            return socket.gethostbyname(hostname)
-        except:
-            return "127.0.0.1"
-    
     def update_server_status(self):
         """Update server status indicator."""
         if self.server_running and self.server_process:
@@ -614,29 +669,55 @@ class ControlPanel:
         if self.server_running:
             return
         
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            if probe.connect_ex(('127.0.0.1', PORT)) == 0:
+                messagebox.showerror("Port In Use",
+                                     f"Something is already running on port {PORT}.\n"
+                                     "Close it (or another copy of the server) and try again.")
+                return
+        
         try:
-            # Start server in subprocess
+            # Send output to a log file: an unread pipe would eventually block the server
             app_path = os.path.join(PROJECT_ROOT, "app.py")
+            self.server_log = open(SERVER_LOG, 'w')
             self.server_process = subprocess.Popen(
                 [sys.executable, app_path],
                 cwd=PROJECT_ROOT,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=self.server_log,
+                stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             )
             self.server_running = True
             self.update_server_status()
-            
-            # Show success message
-            messagebox.showinfo("Server Started", 
-                              f"Server is now running at:\nhttp://{self.local_ip}:5000")
+            # Give it a moment, then confirm it actually came up
+            self.root.after(1500, self.confirm_server_started)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to start server:\n{str(e)}")
+    
+    def confirm_server_started(self):
+        """Report whether the server process survived startup."""
+        if self.server_process and self.server_process.poll() is None:
+            messagebox.showinfo("Server Started",
+                                f"Students can now open:\n{self.base_url}")
+            return
+        self.server_running = False
+        self.server_process = None
+        self.update_server_status()
+        try:
+            with open(SERVER_LOG) as f:
+                tail = ''.join(f.readlines()[-12:])
+        except OSError:
+            tail = ''
+        messagebox.showerror("Server Failed", f"The server stopped during startup.\n\n{tail}")
     
     def stop_server(self):
         """Stop the Flask server."""
         if not self.server_running or not self.server_process:
             return
+        
+        if getattr(self, 'server_log', None):
+            self.server_log.close()
+            self.server_log = None
         
         try:
             if os.name == 'nt':
@@ -657,16 +738,16 @@ class ControlPanel:
                 self.server_running = False
                 self.server_process = None
                 self.update_server_status()
-            except:
+            except Exception:
                 messagebox.showerror("Error", f"Failed to stop server:\n{str(e)}")
     
     def open_browser(self):
         """Open feedback form in browser."""
-        webbrowser.open(f"http://{self.local_ip}:5000")
+        webbrowser.open(self.base_url)
     
     def open_admin(self):
         """Open admin panel in browser."""
-        webbrowser.open(f"http://{self.local_ip}:5000/admin")
+        webbrowser.open(f"{self.base_url}/admin")
     
     def save_academic_period(self):
         """Save semester and session settings."""
@@ -850,6 +931,7 @@ class ControlPanel:
         stats = get_token_stats()
         self.tokens_total_label.config(text=f"Total: {stats['total']}")
         self.tokens_used_label.config(text=f"Used: {stats['used']}")
+        self.tokens_progress_label.config(text=f"In progress: {stats['in_progress']}")
         self.tokens_unused_label.config(text=f"Unused: {stats['unused']}")
     
     def generate_tokens(self):
@@ -862,31 +944,18 @@ class ControlPanel:
             messagebox.showerror("Invalid Input", "Please enter a number between 1 and 1000.")
             return
         
-        # Generate tokens
-        tokens = self.generate_unique_tokens(count)
-        added = add_tokens(tokens)
-        
+        tokens = create_tokens(count)
         self.update_token_stats()
-        self.last_generated_tokens = tokens
         
-        messagebox.showinfo("Tokens Generated", 
-                          f"Generated {len(tokens)} tokens.\n{added} new tokens added to database.")
-    
-    def generate_unique_tokens(self, count, length=6):
-        """Generate unique random tokens."""
-        chars = string.ascii_uppercase + string.digits
-        chars = chars.replace('0', '').replace('O', '').replace('I', '').replace('1', '').replace('L', '')
-        
-        tokens = set()
-        while len(tokens) < count:
-            token = ''.join(random.choices(chars, k=length))
-            tokens.add(token)
-        return list(tokens)
+        messagebox.showinfo("Tokens Generated",
+                            f"Added {len(tokens)} new tokens.\n\n"
+                            "Use 'Print Slips' to hand them out, or export them to a file.")
     
     def export_tokens(self):
-        """Export last generated tokens to file."""
-        if not hasattr(self, 'last_generated_tokens') or not self.last_generated_tokens:
-            messagebox.showwarning("No Tokens", "Please generate tokens first before exporting.")
+        """Export all not-yet-started tokens to a text file."""
+        tokens = get_unused_tokens()
+        if not tokens:
+            messagebox.showwarning("No Tokens", "There are no unused tokens. Generate some first.")
             return
         
         filepath = filedialog.asksaveasfilename(
@@ -897,9 +966,32 @@ class ControlPanel:
         
         if filepath:
             with open(filepath, 'w') as f:
-                for token in self.last_generated_tokens:
-                    f.write(token + '\n')
-            messagebox.showinfo("Exported", f"Tokens exported to:\n{filepath}")
+                f.write('\n'.join(tokens) + '\n')
+            messagebox.showinfo("Exported", f"{len(tokens)} tokens exported to:\n{filepath}")
+    
+    def update_password_status(self):
+        if is_default_admin_password():
+            self.password_status_label.config(
+                text="⚠ Still using the default password 'admin123'. Set your own below.",
+                foreground=ModernStyle.WARNING)
+        else:
+            self.password_status_label.config(text="✓ A custom admin password is set.",
+                                              foreground=ModernStyle.SUCCESS)
+    
+    def save_admin_password(self):
+        """Hash and store a new admin password."""
+        password = self.password_entry.get()
+        if len(password) < 6:
+            messagebox.showerror("Too Short", "Please use at least 6 characters.")
+            return
+        if password != self.password_confirm_entry.get():
+            messagebox.showerror("Mismatch", "The two passwords don't match.")
+            return
+        set_admin_password(password)
+        self.password_entry.delete(0, tk.END)
+        self.password_confirm_entry.delete(0, tk.END)
+        self.update_password_status()
+        messagebox.showinfo("Saved", "Admin password updated. It applies immediately.")
     
     def reset_db(self):
         """Reset the database."""
@@ -912,8 +1004,6 @@ class ControlPanel:
         if result:
             reset_database()
             self.update_token_stats()
-            if hasattr(self, 'last_generated_tokens'):
-                self.last_generated_tokens = []
             messagebox.showinfo("Reset Complete", "Database has been reset.")
     
     def refresh_all(self):
@@ -932,7 +1022,7 @@ class ControlPanel:
         try:
             self.update_token_stats()
             self.update_server_status()
-        except:
+        except Exception:
             pass  # Ignore errors during auto-refresh
         
         # Schedule next refresh in 5 seconds
@@ -959,7 +1049,7 @@ def main():
     # Set icon (optional)
     try:
         root.iconbitmap(os.path.join(PROJECT_ROOT, "icon.ico"))
-    except:
+    except Exception:
         pass
     
     app = ControlPanel(root)

@@ -1,0 +1,42 @@
+{% extends "admin_base.html" %}
+{% from "partials/macros.html" import icon %}
+
+{% block title %}Code slips — Student Feedback{% endblock %}
+
+{% block content %}
+<div class="page-head no-print">
+    <div>
+        <h1>Code slips</h1>
+        <p>{{ slips|length }} unused {{ 'code' if slips|length == 1 else 'codes' }}. Print, cut along the dashed lines and give one slip to each student.</p>
+    </div>
+    <div class="actions">
+        <form method="GET">
+            <label class="visually-hidden" for="limit">Number of slips</label>
+            <select id="limit" name="limit" data-autosubmit>
+                {% for n in (30, 60, 120, 240, 1000) %}
+                <option value="{{ n }}" {% if request.args.get('limit', '60') == n|string %}selected{% endif %}>Up to {{ n }} slips</option>
+                {% endfor %}
+            </select>
+        </form>
+        {% if slips %}<button class="btn btn-primary" type="button" data-print>{{ icon('print') }} Print slips</button>{% endif %}
+    </div>
+</div>
+
+{% if slips %}
+<div class="slips">
+    {% for s in slips %}
+    <div class="slip">
+        {% if s.qr %}<div class="slip-qr">{{ s.qr|safe }}</div>{% endif %}
+        <div class="slip-period">{{ period_label(period) }}</div>
+        <div class="slip-token">{{ s.token }}</div>
+        <div class="slip-url">Scan the code or open<br><span class="mono">{{ base_url|replace("http://", "")|trim("/") }}</span></div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+    <strong>No unused codes</strong>
+    Generate codes in the Control Panel, then come back here to print them.
+</div>
+{% endif %}
+{% endblock %}

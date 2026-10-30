@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import icon, mark, notices %}
+
+{% block body %}
+<header class="topbar">
+    <div class="frame">
+        <a class="brand" href="{{ url_for('admin_dashboard') }}">{{ mark() }} Student Feedback</a>
+        <nav class="topnav" aria-label="Admin">
+            <a href="{{ url_for('admin_dashboard') }}" {% if request.endpoint in ('admin_dashboard', 'admin_report') %}aria-current="page"{% endif %}>Results</a>
+            <a href="{{ url_for('print_tokens') }}" {% if request.endpoint == 'print_tokens' %}aria-current="page"{% endif %}>Token slips</a>
+        </nav>
+        <div class="topbar-aside">
+            <form action="{{ url_for('admin_logout') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn-plain btn" type="submit">Log out</button>
+            </form>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="frame">
+        {{ notices() }}
+        {% block content %}{% endblock %}
+    </div>
+</main>
+{% endblock %}
